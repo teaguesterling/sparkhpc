@@ -6,7 +6,8 @@
 #SBATCH -c {cores_per_executor}
 #SBATCH --mem-per-cpu={memory_per_core} 
 #SBATCH -N {number_of_executors}
-#SBATCH --ntasks-per-core=1
+#SBATCH --ntasks-per-core={ntasks_per_core}
+#SBATCH --partition={queue}
 
 # setup the spark paths
 import os
@@ -14,9 +15,12 @@ os.environ['SPARK_HOME']='{spark_home}'
 os.environ['SPARK_LOCAL_DIRS']='/tmp'
 os.environ['LOCAL_DIRS']=os.environ['SPARK_LOCAL_DIRS']
 os.environ['SPARK_WORKER_DIR']=os.path.join(os.environ['SPARK_LOCAL_DIRS'], 'work')
+os.environ['SPARK_LOG_DIR']=os.path.expanduser(os.environ.get('SPARK_LOG_DIR', '~/.spark/logs'))
 
 from sparkhpc import sparkjob
 
+executor_threads={cores_per_executor} * {ntasks_per_core}
+
 sparkjob.start_cluster('{memory_per_executor}M', 
-                       cores_per_executor={cores_per_executor}, 
+                       cores_per_executor=executor_threads, 
                        spark_home='{spark_home}')

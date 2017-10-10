@@ -80,7 +80,23 @@ def get_launch_commands(scheduler):
 
     return master_launch_command, slaves_launch_command
 
+
 home_dir = os.path.expanduser('~')
+if 'SPARK_LOG_DIR' in os.environ:
+    log_dir = os.path.expanduser(os.environ['SPARK_LOG_DIR'])
+else:
+    global_log_dir = os.path.join(spark_home, 'logs')
+    if os.access(global_log_dir, os.W_OK):
+        log_dir = global_log_dir
+    else:
+        log_dir = os.path.join(home_dir, '.spark', 'logs')
+    os.environ['SPARK_LOG_DIR'] = log_dir
+
+if not os.path.exists(log_dir):
+    if not os.path.exists(os.path.dirname(log_dir)):
+        os.makedirs(os.path.dirname(log_dir))
+    os.makedirs(log_dir)
+
 
 # set up logging
 
@@ -119,11 +135,13 @@ class SparkJob(object):
                 jobid=None,
                 ncores=4,
                 cores_per_executor=1, 
+                ntasks_per_core=1,
                 walltime='00:30',
                 memory_per_core=2000, 
                 memory_per_executor=None,
                 jobname='sparkcluster',  
                 template=None,
+                queue=None,
                 extra_scheduler_options="", 
                 config_dir=None, 
                 spark_home=None,
@@ -139,6 +157,8 @@ class SparkJob(object):
             same as `clusterid` but using directly the scheduler job ID
         ncores: int
             number of cores to request
+        ntasks_per_core: int
+            number of tasks to run on each core to request
         walltime: string
             walltime in `HH:MM` format as a string
         memory_per_core: int
@@ -151,6 +171,8 @@ class SparkJob(object):
             name for the job - only used for the scheduler
         template: file path
             custom template to use for job submission
+        queue: string
+            SLURM Partition (queue) to run the job inside of (default: defq)
         extra_scheduler_options: string
             A string with custom options for the scheduler
         config_dir: directory path
@@ -203,9 +225,13 @@ class SparkJob(object):
             if memory_per_executor is None: 
                 memory_per_executor = memory_per_core * cores_per_executor
 
+            if queue is None:
+                queue = 'defq'
+
             # save the properties in a dictionary
             self.prop_dict = {'ncores': ncores,
                               'cores_per_executor': cores_per_executor,
+                              'ntasks_per_core': ntasks_per_core,
                               'walltime': walltime,
                               'template': template,
                               'memory_per_core': memory_per_core,
@@ -216,6 +242,7 @@ class SparkJob(object):
                               'status': None,
                               'spark_home': spark_home,
                               'scheduler': scheduler,
+                              'queue': queue,
                               'workdir': os.getcwd(),
                               'extra_scheduler_options': extra_scheduler_options
                               }
@@ -340,10 +367,12 @@ class SparkJob(object):
 
         job = template_str.format(walltime=self.walltime, 
                                   ncores=self.ncores, 
+                                  ntasks_per_core=self.ntasks_per_core,
                                   cores_per_executor=self.cores_per_executor,
                                   number_of_executors=self.ncores/self.cores_per_executor,
                                   memory_per_core=self.memory_per_core, 
                                   memory_per_executor=self.memory_per_executor,
+                                  queue=self.queue,
                                   jobname=self.jobname, 
                                   spark_home=self.spark_home,
                                   extra_scheduler_options=self.extra_scheduler_options)
@@ -529,7 +558,7 @@ class SparkJob(object):
         sys.exit(0)
 
 
-def start_cluster(memory, cores_per_executor=1, timeout=30, spark_home=None):
+def start_cluster(memory, cores_per_executor=1, ntasks_per_core=1, timeout=30, spark_home=None):
     """
     Start the spark cluster
 
@@ -576,10 +605,7 @@ def start_cluster(memory, cores_per_executor=1, timeout=30, spark_home=None):
     os.environ['SPARK_MASTER_HOST'] = master_host
     logger.info('master command: ' + master_launch_command.format(master_command))
 
-    if not os.path.exists(os.path.join(spark_home,'logs')):
-        os.makedirs(os.path.join(spark_home,'logs'))
-
-    master_log = '{spark_home}/logs/spark_master.out'.format(spark_home=spark_home)
+    master_log = '{log_dir}/spark_master.out'.format(log_dir=log_dir)
     outfile = open(master_log, 'w+')
     master = subprocess.Popen(shlex.split(master_launch_command.format(master_command)), stdout=outfile, stderr=subprocess.STDOUT)
 
@@ -603,7 +629,7 @@ def start_cluster(memory, cores_per_executor=1, timeout=30, spark_home=None):
     logger.info('['+bc.OKGREEN+'start_cluster] '+bc.ENDC+'master UI available at %s'%master_webui)
 
     sys.stdout.flush()
-    slaves_command = slaves_launch_command.format(spark_home=spark_home, master_url=master_url, cores_per_executor=cores_per_executor)
+    slaves_command = slaves_launch_command.format(spark_home=spark_home, master_url=master_url, cores_per_executor=cores_per_executor, ntasks_per_core=ntasks_per_core)
     logger.info('slaves command: ' + slaves_command)
     p = subprocess.Popen(slaves_command, env = env, shell=True)
     p.wait()

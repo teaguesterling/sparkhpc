@@ -29,12 +29,15 @@ def cli():
 @click.option('--walltime', default="00:30", help="Walltime in HH:MM format")
 @click.option('--jobname', default='sparkcluster', help='Name to use for the job')
 @click.option('--template', default=None, help='Job template path')
+@click.option('--queue', default=None, help='Cluster queue to run in')
 @click.option('--memory-per-executor', default=2000, envvar='SPARK_EXECUTOR_MEMORY',
               help='Memory to reserve for each executor (i.e. the JVM) in MB')
 @click.option('--memory-per-core', default=2000,
               help='Memory per core to request from scheduler in MB')
 @click.option('--cores-per-executor', default=1,
               help='Cores per executor')
+@click.option('--ntasks-per-core', default=1,
+              help='Tasks per core')
 @click.option('--spark-home', default=os.path.join(home,'spark'), envvar='SPARK_HOME', 
               help='Location of the Spark distribution')
 @click.option('--wait', default=False, is_flag=True, help='Wait until the job starts')
@@ -42,9 +45,11 @@ def start(ncores,
           walltime, 
           jobname, 
           template, 
+          queue,
           memory_per_executor, 
           memory_per_core, 
           cores_per_executor,
+          ntasks_per_core,
           spark_home, 
           wait):
     """Start the spark cluster as a batch job"""
@@ -53,9 +58,11 @@ def start(ncores,
                            walltime=walltime, 
                            jobname=jobname, 
                            template=template, 
+                           queue=queue,
                            memory_per_core=memory_per_core,
                            memory_per_executor=memory_per_executor, 
                            cores_per_executor=cores_per_executor,
+                           ntasks_per_core=ntasks_per_core,
                            spark_home=spark_home)
     
     if wait: 

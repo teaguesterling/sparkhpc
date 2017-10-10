@@ -10,6 +10,7 @@ setup(name="sparkhpc",
       packages=['sparkhpc'],
       scripts=['scripts/sparkcluster', 'scripts/hpcnotebook'],
       include_package_data=True,
+      zip_safe=False,
       install_requires=['click', 'findspark'],
       keywords=['pyspark', 'spark', 'hpc', 'slurm', 'lsf']
 )
